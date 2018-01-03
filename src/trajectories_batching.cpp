@@ -14,8 +14,6 @@ static const std::string ROBOT_DESCRIPTION="robot_description";
 
 using namespace baxter_mover;
 
-//double _half_time, _half_time_2;
-
 class test_mover{
     public:
         test_mover(){
@@ -125,6 +123,7 @@ class test_mover{
                     }
             }
 
+
         void right_feedback_callback(const control_msgs::FollowJointTrajectoryActionFeedbackConstPtr& feedback){
                 ROS_WARN("AT THE FEEDBACK, RIGHT :) :) :)");
             }
@@ -196,13 +195,10 @@ class test_mover{
                             boost::bind(&test_mover::left_active_callback, this),
                             boost::bind(&test_mover::left_feedback_callback, this, _1, _left_target_joint_values));
 
+                ros::Duration(_half_time).sleep();
+                ROS_WARN("111111111111111");
 
-                while(!_half_done && !ac.getState().isDone());
-                ROS_WARN("I AM IN THE WHILE IN THE IF 111111111111111");
-
-                //execute second trajectory
-                _half_done = false;
-                //update targeted joints configurations with half of second trajectory
+                //execute second trajectory//set the half of the trajecotry as targeted joints configurations
                 _left_target_joint_values = _goal_2.trajectory.points[_index_2].positions;
                 ac.cancelAllGoals();
                 ac.sendGoal(_goal_2,
@@ -210,20 +206,20 @@ class test_mover{
                             boost::bind(&test_mover::left_active_callback, this),
                             boost::bind(&test_mover::left_feedback_callback, this, _1, _left_target_joint_values));
 
-                while(!_half_done && !ac.getState().isDone());
-                ROS_WARN("I AM IN THE WHILE IN THE IF 222222222222222");
+                ros::Duration(_half_time_2).sleep();
+                ROS_WARN("222222222222222");
                 //execute last trajectory, no need for monitoring this one, just execute it completely
                 ac.cancelAllGoals();
                 ac.sendGoalAndWait(_goal_3);
 
-                ROS_WARN("I AM IN THE WHILE IN THE IF 333333333333");
+                ROS_WARN("333333333333");
                 ROS_WARN("**************************************************************************");
             }
     private:
         ros::NodeHandle _nh;
         std::unique_ptr<ros::AsyncSpinner> _my_spinner;
         BAXTER_Mover::Ptr _baxter_mover;
-        ros::Subscriber _joint_states_sub, _left_feedback_sub, _right_feedback_sub;
+        ros::Subscriber _joint_states_sub, _new_trajectory_goal_left_sub, _new_trajectory_goal_right_sub;
         std::vector<double> _right_joint_states, _left_joint_states, _left_target_joint_values, _right_target_joint_values;
         control_msgs::FollowJointTrajectoryGoal _goal, _goal_2, _goal_3;
         moveit::planning_interface::MoveGroup::Plan _the_plan, _plan_2, _plan_3;
