@@ -26,6 +26,9 @@ class test_mover{
                 _baxter_mover.reset(new BAXTER_Mover(_nh));
                 _right_joint_states = std::vector<double>(7, 0);
                 _left_joint_states = std::vector<double>(7, 0);
+                _zero_vector = std::vector<double>(7, 0);
+                _right_joint_velocity = std::vector<double> (7, 0);
+                _left_joint_velocity = std::vector<double> (7, 0);
 
                 _my_spinner.reset(new ros::AsyncSpinner(1));
                 _my_spinner->start();
@@ -58,6 +61,29 @@ class test_mover{
                                                                                                   jo_state->name.end(),
                                                                                                   _baxter_mover->global_parameters.get_baxter_right_arm_joints_names()[6]))];
 
+                //right arm joints velocities
+                _right_joint_velocity[0] = jo_state->velocity[distance(jo_state->name.begin(), find(jo_state->name.begin(),
+                                                                                                    jo_state->name.end(),
+                                                                                                    _baxter_mover->global_parameters.get_baxter_right_arm_joints_names()[0]))];
+                _right_joint_velocity[1] = jo_state->velocity[distance(jo_state->name.begin(), find(jo_state->name.begin(),
+                                                                                                    jo_state->name.end(),
+                                                                                                    _baxter_mover->global_parameters.get_baxter_right_arm_joints_names()[1]))];
+                _right_joint_velocity[2] = jo_state->velocity[distance(jo_state->name.begin(), find(jo_state->name.begin(),
+                                                                                                    jo_state->name.end(),
+                                                                                                    _baxter_mover->global_parameters.get_baxter_right_arm_joints_names()[2]))];
+                _right_joint_velocity[3] = jo_state->velocity[distance(jo_state->name.begin(), find(jo_state->name.begin(),
+                                                                                                    jo_state->name.end(),
+                                                                                                    _baxter_mover->global_parameters.get_baxter_right_arm_joints_names()[3]))];
+                _right_joint_velocity[4] = jo_state->velocity[distance(jo_state->name.begin(), find(jo_state->name.begin(),
+                                                                                                    jo_state->name.end(),
+                                                                                                    _baxter_mover->global_parameters.get_baxter_right_arm_joints_names()[4]))];
+                _right_joint_velocity[5] = jo_state->velocity[distance(jo_state->name.begin(), find(jo_state->name.begin(),
+                                                                                                    jo_state->name.end(),
+                                                                                                    _baxter_mover->global_parameters.get_baxter_right_arm_joints_names()[5]))];
+                _right_joint_velocity[6] = jo_state->velocity[distance(jo_state->name.begin(), find(jo_state->name.begin(),
+                                                                                                    jo_state->name.end(),
+                                                                                                    _baxter_mover->global_parameters.get_baxter_right_arm_joints_names()[6]))];
+
                 //left arm joints values
                 _left_joint_states[0] = jo_state->position[distance(jo_state->name.begin(), find(jo_state->name.begin(),
                                                                                                  jo_state->name.end(),
@@ -80,6 +106,31 @@ class test_mover{
                 _left_joint_states[6] = jo_state->position[distance(jo_state->name.begin(), find(jo_state->name.begin(),
                                                                                                  jo_state->name.end(),
                                                                                                  _baxter_mover->global_parameters.get_baxter_left_arm_joints_names()[6]))];
+                //left arm joints velocities
+                _left_joint_velocity[0] = jo_state->velocity[distance(jo_state->name.begin(), find(jo_state->name.begin(),
+                                                                                                    jo_state->name.end(),
+                                                                                                    _baxter_mover->global_parameters.get_baxter_left_arm_joints_names()[0]))];
+                _left_joint_velocity[1] = jo_state->velocity[distance(jo_state->name.begin(), find(jo_state->name.begin(),
+                                                                                                    jo_state->name.end(),
+                                                                                                    _baxter_mover->global_parameters.get_baxter_left_arm_joints_names()[1]))];
+                _left_joint_velocity[2] = jo_state->velocity[distance(jo_state->name.begin(), find(jo_state->name.begin(),
+                                                                                                    jo_state->name.end(),
+                                                                                                    _baxter_mover->global_parameters.get_baxter_left_arm_joints_names()[2]))];
+                _left_joint_velocity[3] = jo_state->velocity[distance(jo_state->name.begin(), find(jo_state->name.begin(),
+                                                                                                    jo_state->name.end(),
+                                                                                                    _baxter_mover->global_parameters.get_baxter_left_arm_joints_names()[3]))];
+                _left_joint_velocity[4] = jo_state->velocity[distance(jo_state->name.begin(), find(jo_state->name.begin(),
+                                                                                                    jo_state->name.end(),
+                                                                                                    _baxter_mover->global_parameters.get_baxter_left_arm_joints_names()[4]))];
+                _left_joint_velocity[5] = jo_state->velocity[distance(jo_state->name.begin(), find(jo_state->name.begin(),
+                                                                                                    jo_state->name.end(),
+                                                                                                    _baxter_mover->global_parameters.get_baxter_left_arm_joints_names()[5]))];
+                _left_joint_velocity[6] = jo_state->velocity[distance(jo_state->name.begin(), find(jo_state->name.begin(),
+                                                                                                    jo_state->name.end(),
+                                                                                                    _baxter_mover->global_parameters.get_baxter_left_arm_joints_names()[6]))];
+                if(_flag_for_joint_states_cb)
+                    if(largest_difference(_left_joint_velocity, _zero_vector) < 0.01)
+                        ROS_ERROR("ACTUAL VELOCITY OF ZEROS");
             }
 
         //get largest difference between elements of two vectors
@@ -121,11 +172,17 @@ class test_mover{
                 if(diff < 0.04){
                         ROS_INFO("TRAJECTORY HALF DONE YEAH !!!");
                         _half_done = true;
+                        _flag_for_joint_states_cb = true;
                     }
                 else{
-                        //ROS_WARN_STREAM("TRAJECTORY HALF NOT DONE DONE, largest difference is : " << diff);
+                        ROS_WARN_STREAM("TRAJECTORY HALF NOT DONE DONE, largest difference is : " << diff);
                         _half_done = false;
+                        _flag_for_joint_states_cb = false;
                     }
+                if(largest_difference(_current_left_feedback_velocities, _zero_vector) < 0.01)
+                    ROS_WARN("DESIRED VELOCITY OF ZEROS");
+                if(largest_difference(_left_joint_velocity, _zero_vector) < 0.01)
+                    ROS_ERROR("ACTUAL VELOCITY OF ZEROS");
             }
 
         void right_feedback_callback(const control_msgs::FollowJointTrajectoryActionFeedbackConstPtr& feedback){
@@ -149,12 +206,12 @@ class test_mover{
                 std::vector<double> a_2 = current_feedback_acceleration;
                 std::vector<double> a_3(7, 0);
 
-                ROS_INFO_STREAM("INITIALIZING COEFFECIENTS, A_0 size = " << a_0.size() << " A_1 size = " << a_1.size() << " A_2 size = " << a_2.size());
+                //ROS_INFO_STREAM("INITIALIZING COEFFECIENTS, A_0 size = " << a_0.size() << " A_1 size = " << a_1.size() << " A_2 size = " << a_2.size());
                 //get a_3 vector of coeffecients
                 for(int i = 0; i < 7; i++){
                         a_3[i] = (trajectory.trajectory.points[1].positions[i] - a_0[i] - a_1[i] * trajectory.trajectory.points[1].time_from_start.toSec() -
                                 a_2[i] * pow(trajectory.trajectory.points[1].time_from_start.toSec(), 2.0)) / pow(trajectory.trajectory.points[1].time_from_start.toSec(), 3.0);
-                        ROS_INFO_STREAM("ELEMENT : " << i << " of A_3 is : " << a_3[i]);
+                        //ROS_INFO_STREAM("ELEMENT : " << i << " of A_3 is : " << a_3[i]);
                     }
 
 
@@ -170,7 +227,7 @@ class test_mover{
                                 trajectory.trajectory.points[i].accelerations[j] = 2 * a_2[j] +
                                         6 * a_3[j] * trajectory.trajectory.points[i].time_from_start.toSec();
                             }
-                        ROS_INFO_STREAM("MODIFYING ELEMENT : " << i << " of trajectory with : " << trajectory.trajectory.points.size() << " POINTS");
+                        //ROS_INFO_STREAM("MODIFYING ELEMENT : " << i << " of trajectory with : " << trajectory.trajectory.points.size() << " POINTS");
                     }
             }
 
@@ -257,10 +314,12 @@ class test_mover{
 
                 while(!_half_done && !ac.getState().isDone());
                 ROS_WARN("I AM IN THE WHILE IN THE IF 222222222222222");
+
                 modify_trajectory(_goal_3);
                 //ac.cancelAllGoals();
                 ac.sendGoalAndWait(_goal_3);
 
+                _flag_for_joint_states_cb = false;
                 ROS_WARN("I AM IN THE WHILE IN THE IF 333333333333");
                 ROS_WARN("**************************************************************************");
             }
@@ -269,14 +328,14 @@ class test_mover{
         std::unique_ptr<ros::AsyncSpinner> _my_spinner;
         BAXTER_Mover::Ptr _baxter_mover;
         ros::Subscriber _joint_states_sub, _left_feedback_sub, _right_feedback_sub;
-        std::vector<double> _right_joint_states, _left_joint_states, _left_target_joint_values, _right_target_joint_values;
+        std::vector<double> _right_joint_states, _left_joint_states, _left_target_joint_values, _right_target_joint_values, _right_joint_velocity, _left_joint_velocity;
         control_msgs::FollowJointTrajectoryGoal _goal, _goal_2, _goal_3;
-        std::vector<double> _current_left_feedback_velocities, _current_left_feedback_accelerations;
+        std::vector<double> _current_left_feedback_velocities, _current_left_feedback_accelerations, _zero_vector;
         moveit::planning_interface::MoveGroup::Plan _the_plan, _plan_2, _plan_3;
         robot_state::RobotStatePtr _start_state_second_trajectory, _start_state_third_trajectory;
         double _x, _y, _z, _min_x = 0.4, _max_x = 1.0, _min_y = 0.0, _max_y = 1.0, _min_z = 0.0, _max_z = 0.4;
         double _half_time, _half_time_2;
-        bool _initialized = false, _trajectory_done = false, _half_done = false;
+        bool _initialized = false, _trajectory_done = false, _half_done = false, _flag_for_joint_states_cb = false;
         int _trajectory_size = 0;
         size_t _the_index, _index_2;
     };
