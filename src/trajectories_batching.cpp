@@ -111,6 +111,11 @@ class test_mover{
             }
 
         void left_feedback_callback(const control_msgs::FollowJointTrajectoryFeedbackConstPtr& feedback, std::vector<double> target_joint_values){
+                //ROS_WARN_STREAM("AT THE FEEDBACK, LEFT TIME FROM START : " << feedback->actual.time_from_start.toSec());
+                //ROS_INFO_STREAM("The Half time for the trajectory Is : " << time);
+                _current_left_feedback_velocities = feedback->desired.velocities;
+                _current_left_feedback_accelerations = feedback->desired.accelerations;
+
                 std::vector<double> feedback_joint_values = feedback->actual.positions;
                 double diff = largest_difference(target_joint_values, feedback_joint_values);
                 if(diff < 0.04){
@@ -118,11 +123,10 @@ class test_mover{
                         _half_done = true;
                     }
                 else{
-                        ROS_WARN_STREAM("TRAJECTORY HALF NOT DONE DONE, largest difference is : " << diff);
+                        //ROS_WARN_STREAM("TRAJECTORY HALF NOT DONE DONE, largest difference is : " << diff);
                         _half_done = false;
                     }
             }
-
 
         void right_feedback_callback(const control_msgs::FollowJointTrajectoryActionFeedbackConstPtr& feedback){
                 ROS_WARN("AT THE FEEDBACK, RIGHT :) :) :)");
@@ -131,6 +135,43 @@ class test_mover{
         bool bigger_half_time(trajectory_msgs::JointTrajectoryPoint point, double time){
                 //ROS_INFO_STREAM("This point time from start is : " << point.time_from_start.toSec());
                 return point.time_from_start.toSec() > time;
+            }
+
+        void modify_trajectory(control_msgs::FollowJointTrajectoryGoal& trajectory){
+                if(trajectory.trajectory.points.size() < 2){
+                        ROS_ERROR("THE TRAJECTORY HAS ONLY ONE POINT, CAN'T BE PROCESSED");
+                        return;
+                    }
+                std::vector<double> current_feedback_velocity = _current_left_feedback_velocities;
+                std::vector<double> current_feedback_acceleration = _current_left_feedback_accelerations;
+                std::vector<double> a_0 = trajectory.trajectory.points[0].positions;
+                std::vector<double> a_1 = current_feedback_velocity;
+                std::vector<double> a_2 = current_feedback_acceleration;
+                std::vector<double> a_3(7, 0);
+
+                ROS_INFO_STREAM("INITIALIZING COEFFECIENTS, A_0 size = " << a_0.size() << " A_1 size = " << a_1.size() << " A_2 size = " << a_2.size());
+                //get a_3 vector of coeffecients
+                for(int i = 0; i < 7; i++){
+                        a_3[i] = (trajectory.trajectory.points[1].positions[i] - a_0[i] - a_1[i] * trajectory.trajectory.points[1].time_from_start.toSec() -
+                                a_2[i] * pow(trajectory.trajectory.points[1].time_from_start.toSec(), 2.0)) / pow(trajectory.trajectory.points[1].time_from_start.toSec(), 3.0);
+                        ROS_INFO_STREAM("ELEMENT : " << i << " of A_3 is : " << a_3[i]);
+                    }
+
+
+
+                for(size_t i = 0; i < trajectory.trajectory.points.size(); i++){
+                        for(size_t j = 0; j < trajectory.trajectory.points[i].velocities.size(); j++){
+                                //modify velocities
+                                trajectory.trajectory.points[i].velocities[j] = a_1[j] +
+                                        2 * a_2[j] * trajectory.trajectory.points[i].time_from_start.toSec() +
+                                        3 * a_3[j] * pow(trajectory.trajectory.points[i].time_from_start.toSec() , 2.0);
+
+                                //modify accelerations
+                                trajectory.trajectory.points[i].accelerations[j] = 2 * a_2[j] +
+                                        6 * a_3[j] * trajectory.trajectory.points[i].time_from_start.toSec();
+                            }
+                        ROS_INFO_STREAM("MODIFYING ELEMENT : " << i << " of trajectory with : " << trajectory.trajectory.points.size() << " POINTS");
+                    }
             }
 
         void plan_and_execute(actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>& ac){
@@ -156,10 +197,14 @@ class test_mover{
                 _trajectory_size = _the_plan.trajectory_.joint_trajectory.points.size();
                 _goal.trajectory = _the_plan.trajectory_.joint_trajectory;
                 _half_time = _goal.trajectory.points.back().time_from_start.toSec()/2.0;
+                //ROS_WARN_STREAM("Half time for first trajectory is : " << _half_time);
 
                 auto it = std::find_if(_goal.trajectory.points.begin(), _goal.trajectory.points.end(), std::bind(&test_mover::bigger_half_time, this, std::placeholders::_1, _half_time));
                 _the_index = distance(_goal.trajectory.points.begin(), it);
 
+                //ROS_WARN_STREAM("INDEX OF FIRST TRAJECTORY HALF TIME IS : " << _the_index);
+
+                _left_target_joint_values = _goal.trajectory.points[_the_index].positions;
                 //find second plan
                 _start_state_second_trajectory = _baxter_mover->group->getCurrentState();
                 moveit::core::jointTrajPointToRobotState(_goal.trajectory, _the_index, *_start_state_second_trajectory);
@@ -171,9 +216,12 @@ class test_mover{
                     }
                 _goal_2.trajectory = _plan_2.trajectory_.joint_trajectory;
                 _half_time_2 = _goal_2.trajectory.points.back().time_from_start.toSec()/2.0;
+                //ROS_WARN_STREAM("Half time for second trajectory is : " << _half_time_2);
 
                 it = std::find_if(_goal_2.trajectory.points.begin(), _goal_2.trajectory.points.end(), std::bind(&test_mover::bigger_half_time, this, std::placeholders::_1, _half_time_2));
                 _index_2 = distance(_goal_2.trajectory.points.begin(), it);
+
+                //ROS_WARN_STREAM("INDEX OF SECOND TRAJECTORY HALF TIME IS : " << _index_2);
 
                 //find third plan
                 _start_state_third_trajectory = _baxter_mover->group->getCurrentState();
@@ -187,41 +235,43 @@ class test_mover{
                 _goal_3.trajectory = _plan_3.trajectory_.joint_trajectory;
 
                 //execute those trajectories, half of first and second ones and the whole third one
-                //set the half of the trajecotry as targeted joints configurations
-                _left_target_joint_values = _goal.trajectory.points[_the_index].positions;
                 _baxter_mover->group->setStartState(*_baxter_mover->group->getCurrentState());
+
                 ac.sendGoal(_goal,
                             boost::bind(&test_mover::left_done_callback, this, _1),
                             boost::bind(&test_mover::left_active_callback, this),
                             boost::bind(&test_mover::left_feedback_callback, this, _1, _left_target_joint_values));
 
-                ros::Duration(_half_time).sleep();
-                ROS_WARN("111111111111111");
 
-                //execute second trajectory//set the half of the trajecotry as targeted joints configurations
+                while(!_half_done && !ac.getState().isDone());
+                ROS_WARN("I AM IN THE WHILE IN THE IF 111111111111111");
+                modify_trajectory(_goal_2);
+                _half_done = false;
+
                 _left_target_joint_values = _goal_2.trajectory.points[_index_2].positions;
-                ac.cancelAllGoals();
+                //ac.cancelAllGoals();
                 ac.sendGoal(_goal_2,
                             boost::bind(&test_mover::left_done_callback, this, _1),
                             boost::bind(&test_mover::left_active_callback, this),
                             boost::bind(&test_mover::left_feedback_callback, this, _1, _left_target_joint_values));
 
-                ros::Duration(_half_time_2).sleep();
-                ROS_WARN("222222222222222");
-                //execute last trajectory, no need for monitoring this one, just execute it completely
-                ac.cancelAllGoals();
+                while(!_half_done && !ac.getState().isDone());
+                ROS_WARN("I AM IN THE WHILE IN THE IF 222222222222222");
+                modify_trajectory(_goal_3);
+                //ac.cancelAllGoals();
                 ac.sendGoalAndWait(_goal_3);
 
-                ROS_WARN("333333333333");
+                ROS_WARN("I AM IN THE WHILE IN THE IF 333333333333");
                 ROS_WARN("**************************************************************************");
             }
     private:
         ros::NodeHandle _nh;
         std::unique_ptr<ros::AsyncSpinner> _my_spinner;
         BAXTER_Mover::Ptr _baxter_mover;
-        ros::Subscriber _joint_states_sub, _new_trajectory_goal_left_sub, _new_trajectory_goal_right_sub;
+        ros::Subscriber _joint_states_sub, _left_feedback_sub, _right_feedback_sub;
         std::vector<double> _right_joint_states, _left_joint_states, _left_target_joint_values, _right_target_joint_values;
         control_msgs::FollowJointTrajectoryGoal _goal, _goal_2, _goal_3;
+        std::vector<double> _current_left_feedback_velocities, _current_left_feedback_accelerations;
         moveit::planning_interface::MoveGroup::Plan _the_plan, _plan_2, _plan_3;
         robot_state::RobotStatePtr _start_state_second_trajectory, _start_state_third_trajectory;
         double _x, _y, _z, _min_x = 0.4, _max_x = 1.0, _min_y = 0.0, _max_y = 1.0, _min_z = 0.0, _max_z = 0.4;
