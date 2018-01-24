@@ -175,7 +175,7 @@ class test_mover{
                         _flag_for_joint_states_cb = true;
                     }
                 else{
-                        ROS_WARN_STREAM("TRAJECTORY HALF NOT DONE DONE, largest difference is : " << diff);
+                        //ROS_WARN_STREAM("TRAJECTORY HALF NOT DONE DONE, largest difference is : " << diff);
                         _half_done = false;
                         _flag_for_joint_states_cb = false;
                     }
@@ -237,13 +237,34 @@ class test_mover{
                 _half_done = false;
                 _trajectory_size = 0;
 
-                _x = (_max_x - _min_x) * ((double)rand() / (double)RAND_MAX) + _min_x;
-                _y = (_max_y - _min_y) * ((double)rand() / (double)RAND_MAX) + _min_y;
-                _z = (_max_z - _min_z) * ((double)rand() / (double)RAND_MAX) + _min_z;
+//                _x = (_max_x - _min_x) * ((double)rand() / (double)RAND_MAX) + _min_x;
+//                _y = (_max_y - _min_y) * ((double)rand() / (double)RAND_MAX) + _min_y;
+//                _z = (_max_z - _min_z) * ((double)rand() / (double)RAND_MAX) + _min_z;
 
+                geometry_msgs::Pose the_point;
+                the_point.position.x = 0.65;
+                the_point.position.y = 0.6;
+                the_point.position.z = 0.25;
+                the_point.orientation.w = 0.0;
+                the_point.orientation.x = 0.0;
+                the_point.orientation.y = 1.0;
+                the_point.orientation.z = 0.0;
 
-                _baxter_mover->group->setPositionTarget(_x, _y, _z);
+                _baxter_mover->group->setPoseTarget(the_point);
+//                _baxter_mover->group->setPositionTarget(0.65, 0.6, 0.25);
                 _baxter_mover->group->plan(_the_plan);
+                _baxter_mover->group->execute(_the_plan);
+
+                _waypoints.clear();
+                _waypoints.push_back(the_point);
+                //geometry_msgs::Pose the_point;
+                the_point.position.y = 0.4;
+
+                _waypoints.push_back(the_point);
+
+                double fraction_0 = _baxter_mover->group->computeCartesianPath(_waypoints, 0.01, 0.0, _robot_trajectory_0);
+                ROS_WARN_STREAM("fraction solved of desired path 0 in this trial is: " <<
+                                fraction_0);
 
                 if(!ac.waitForServer(ros::Duration(2.0)))
                     {
@@ -251,8 +272,10 @@ class test_mover{
                         return ;
                     }
 
-                _trajectory_size = _the_plan.trajectory_.joint_trajectory.points.size();
-                _goal.trajectory = _the_plan.trajectory_.joint_trajectory;
+                //_trajectory_size = _the_plan.trajectory_.joint_trajectory.points.size();
+                //_goal.trajectory = _the_plan.trajectory_.joint_trajectory;
+                _trajectory_size = _robot_trajectory_0.joint_trajectory.points.size();
+                _goal.trajectory = _robot_trajectory_0.joint_trajectory;
                 _half_time = _goal.trajectory.points.back().time_from_start.toSec()/2.0;
                 //ROS_WARN_STREAM("Half time for first trajectory is : " << _half_time);
 
@@ -268,11 +291,20 @@ class test_mover{
                 _baxter_mover->group->setStartState(*_start_state_second_trajectory);
                 bool second_plan = false;
                 while(!second_plan){
-                        _baxter_mover->group->setRandomTarget();
-                        second_plan = _baxter_mover->group->plan(_plan_2);
+                        //_baxter_mover->group->setRandomTarget();
+                        //second_plan = _baxter_mover->group->plan(_plan_2);
+                        _waypoints.clear();
+                        the_point.position.y -= 0.2;
+                        _waypoints.push_back(the_point);
+                        double fraction_1 = _baxter_mover->group->computeCartesianPath(_waypoints, 0.01, 0.0, _robot_trajectory_1);
+                        ROS_WARN_STREAM("fraction solved of desired path 1 in this trial is: " <<
+                                        fraction_1);
+                        if(fraction_1 == 1)
+                            second_plan = true;
                     }
-                _goal_2.trajectory = _plan_2.trajectory_.joint_trajectory;
-                _half_time_2 = _goal_2.trajectory.points.back().time_from_start.toSec()/2.0;
+                //_goal_2.trajectory = _plan_2.trajectory_.joint_trajectory;
+                _goal_2.trajectory = _robot_trajectory_1.joint_trajectory;
+                //_half_time_2 = _goal_2.trajectory.points.back().time_from_start.toSec()/2.0;
                 //ROS_WARN_STREAM("Half time for second trajectory is : " << _half_time_2);
 
                 it = std::find_if(_goal_2.trajectory.points.begin(), _goal_2.trajectory.points.end(), std::bind(&test_mover::bigger_half_time, this, std::placeholders::_1, _half_time_2));
@@ -286,10 +318,19 @@ class test_mover{
                 _baxter_mover->group->setStartState(*_start_state_third_trajectory);
                 bool third_plan = false;
                 while(!third_plan){
-                        _baxter_mover->group->setRandomTarget();
-                        third_plan = _baxter_mover->group->plan(_plan_3);
+                        //_baxter_mover->group->setRandomTarget();
+                        //third_plan = _baxter_mover->group->plan(_plan_3);
+                        _waypoints.clear();
+                        the_point.position.y -= 0.2;
+                        _waypoints.push_back(the_point);
+                        double fraction_2 = _baxter_mover->group->computeCartesianPath(_waypoints, 0.01, 0.0, _robot_trajectory_2);
+                        ROS_WARN_STREAM("fraction solved of desired path 2 in this trial is: " <<
+                                        fraction_2);
+                        if(fraction_2 == 1)
+                            third_plan = true;
                     }
-                _goal_3.trajectory = _plan_3.trajectory_.joint_trajectory;
+                //_goal_3.trajectory = _plan_3.trajectory_.joint_trajectory;
+                _goal_3.trajectory = _robot_trajectory_2.joint_trajectory;
 
                 //execute those trajectories, half of first and second ones and the whole third one
                 _baxter_mover->group->setStartState(*_baxter_mover->group->getCurrentState());
@@ -332,12 +373,14 @@ class test_mover{
         control_msgs::FollowJointTrajectoryGoal _goal, _goal_2, _goal_3;
         std::vector<double> _current_left_feedback_velocities, _current_left_feedback_accelerations, _zero_vector;
         moveit::planning_interface::MoveGroup::Plan _the_plan, _plan_2, _plan_3;
+        moveit_msgs::RobotTrajectory _robot_trajectory_0, _robot_trajectory_1, _robot_trajectory_2;
         robot_state::RobotStatePtr _start_state_second_trajectory, _start_state_third_trajectory;
         double _x, _y, _z, _min_x = 0.4, _max_x = 1.0, _min_y = 0.0, _max_y = 1.0, _min_z = 0.0, _max_z = 0.4;
         double _half_time, _half_time_2;
         bool _initialized = false, _trajectory_done = false, _half_done = false, _flag_for_joint_states_cb = false;
         int _trajectory_size = 0;
         size_t _the_index, _index_2;
+        std::vector<geometry_msgs::Pose> _waypoints;
     };
 
 int main(int argc, char **argv)
