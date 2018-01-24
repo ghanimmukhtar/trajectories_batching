@@ -255,6 +255,7 @@ class test_mover{
                 _baxter_mover->group->plan(_the_plan);
                 _baxter_mover->group->execute(_the_plan);
 
+                _baxter_mover->group->setStartState(*_baxter_mover->group->getCurrentState());
                 _waypoints.clear();
                 _waypoints.push_back(the_point);
                 //geometry_msgs::Pose the_point;
@@ -304,7 +305,7 @@ class test_mover{
                     }
                 //_goal_2.trajectory = _plan_2.trajectory_.joint_trajectory;
                 _goal_2.trajectory = _robot_trajectory_1.joint_trajectory;
-                //_half_time_2 = _goal_2.trajectory.points.back().time_from_start.toSec()/2.0;
+                _half_time_2 = _goal_2.trajectory.points.back().time_from_start.toSec()/2.0;
                 //ROS_WARN_STREAM("Half time for second trajectory is : " << _half_time_2);
 
                 it = std::find_if(_goal_2.trajectory.points.begin(), _goal_2.trajectory.points.end(), std::bind(&test_mover::bigger_half_time, this, std::placeholders::_1, _half_time_2));
